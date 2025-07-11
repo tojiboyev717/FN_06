@@ -76,7 +76,7 @@ function init() {
         // Har 1 daqiqada bir honey olish
         setInterval(() => {
             withdrawHoney(bot, mcData);
-        }, 5 * 60 * 1000);
+        }, 60 * 1000);
         // Har 1 daqiqada /is warp sell yozish
         setInterval(() => {
             bot.chat('/is warp sell');
@@ -120,68 +120,84 @@ bot.on('windowOpen', async (window) => {
     });
 	
     async function withdrawHoney(bot, mcData) {
-        bot.chat('/is warp sell');
+    // Warpdanga ishonch hosil qilish
+    bot.chat('/is warp sell');
 
-        setTimeout(async () => {
-            const chestPosVec = new Vec3(5525, 90, -4377); // ✅ Siz ko‘rsatgan koordinata
-            const chestBlock = bot.blockAt(chestPosVec);
+    setTimeout(async () => {
+        // 📍 1. Chest joylashuvi
+        const chestPosVec = new Vec3(5525, 90, -4377); // ➤ Siz bergan aniq koordinata
+        const chestBlock = bot.blockAt(chestPosVec);
 
-            if (!chestBlock || chestBlock.name !== 'chest') {
-                console.log("❌ Koordinatadagi blok chest emas yoki topilmadi.");
-                return;
-            }
+        // ❌ Agar bu yerda chest bo‘lmasa, to‘xtaymiz
+        if (!chestBlock || chestBlock.name !== 'chest') {
+            console.log("❌ Koordinatadagi blok chest emas yoki topilmadi.");
+            return;
+        }
 
-            let attempts = 0;
-            let chest = null;
-            const maxAttempts = 3;
+        let attempts = 0;
+        let chest = null;
+        const maxAttempts = 3;
 
-            while (!chest && attempts < maxAttempts) {
-                try {
-                    chest = await bot.openChest(chestBlock);
-                } catch (error) {
-                    console.log(`⚠️ Error opening chest: ${error.message}. Retrying...`);
-                    attempts++;
+        // 🔁 2. Chestni ochishga urinish
+        while (!chest && attempts < maxAttempts) {
+            try {
+                chest = await bot.openChest(chestBlock);
+            } catch (error) {
+                console.log(`⚠️ Error opening chest: ${error.message}. Retrying...`);
+                attempts++;
 
-                    if (error.message.includes('timeout of 20000ms')) {
-                        console.log("❌ Window open timeout. Restarting bot...");
-                        bot.quit('reconnect');
-                        return;
-                    }
-
-                    await new Promise(resolve => setTimeout(resolve, 5000));
+                if (error.message.includes('timeout of 20000ms')) {
+                    console.log("❌ Chest window timeout. Reconnecting...");
+                    bot.quit('reconnect');
+                    return;
                 }
+
+                await new Promise(resolve => setTimeout(resolve, 3000));
             }
+        }
 
-            if (!chest) {
-                console.log("❌ Chest ochilmadi, urinishlar tugadi.");
-                return;
-            }
+        if (!chest) {
+            console.log("❌ Chest ochilmadi, barcha urinishlar bekor bo‘ldi.");
+            return;
+        }
 
-            for (let slot of chest.slots) {
-                if (slot?.name === 'honey_bottle' && slot.count > 0) {
-                    while (slot.count > 0 && bot.inventory.emptySlotCount() > 0) {
-                        let withdrawCount = Math.min(slot.count, 64);
-                        try {
-                            await chest.withdraw(slot.type, null, withdrawCount);
-                            slot.count -= withdrawCount;
-                        } catch (err) {
-                            console.log(`⚠️ Honey olishda xatolik: ${err.message}`);
-                            break;
-                        }
-                    }
+        // 🧪 3. Honey_bottle item ID’sini aniqlash
+        const honeyItem = mcData.itemsByName['honey_bottle'];
+        if (!honeyItem) {
+            console.log("❌ honey_bottle item topilmadi mcData ichida.");
+            await chest.close();
+            return;
+        }
 
-                    if (bot.inventory.emptySlotCount() === 0) {
-                        console.log("✅ Inventory to‘ldi.");
+        const honeyId = honeyItem.id;
+
+        // 🍯 4. Honey bottle larni olish
+        for (let slot of chest.slots) {
+            if (slot?.name === 'honey_bottle' && slot.count > 0) {
+                while (slot.count > 0 && bot.inventory.emptySlotCount() > 0) {
+                    const countToWithdraw = Math.min(slot.count, 64);
+                    try {
+                        await chest.withdraw(honeyId, null, countToWithdraw); // ✅ To‘g‘ri ID bilan withdraw
+                        slot.count -= countToWithdraw;
+                        console.log(`✅ ${countToWithdraw} ta honey_bottle olindi.`);
+                    } catch (err) {
+                        console.log(`⚠️ Honey olishda xatolik: ${err.message}`);
                         break;
                     }
                 }
-            }
 
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            await chest.close();
-            bot.chat('/is shop Food');
-        }, 1000);
-    }
+                if (bot.inventory.emptySlotCount() === 0) {
+                    console.log("✅ Inventory to‘ldi. Yana olish imkonsiz.");
+                    break;
+                }
+            }
+        }
+
+        // ✅ 5. Chestni yopish va do‘konga kirish
+        await chest.close();
+        bot.chat('/is shop Food');
+    }, 1000); // 1 soniya kutib ochamiz
+}
 
     bot.on('end', () => {
         setTimeout(init, 5000);
