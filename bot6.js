@@ -12,7 +12,7 @@ const botOption = {
     port: 25565,
     username: botUsername,
     password: botPassword,
-    version: '1.18.1',
+    version: '1.18.2',
 };
 
 init();
@@ -133,18 +133,21 @@ bot.on('windowOpen', async (window) => {
             const maxAttempts = 3;
 
             while (!chest && attempts < maxAttempts) {
-                try {
-                    chest = await bot.openChest(chestPosition);
-                } catch (error) {
-                    console.log(`Error opening chest: ${error}. Retrying...`);
-                    attempts++;
-                    console.log(error);
-                    if (error.includes(`timeout of 20000ms`)) {
-                        await bot.quit('reconnect')
-                    }
-                    // await new Promise(resolve => setTimeout(resolve, 5000));
-                }
-            }
+    try {
+        chest = await bot.openChest(chestPosition);
+    } catch (error) {
+        console.log(`Error opening chest: ${error}. Retrying...`);
+        attempts++;
+
+        // ✅ Xato bo'lgan qismni tuzatdik:
+        if (error.message && error.message.includes(`timeout of 20000ms`)) {
+            bot.quit('reconnect');
+            return; // Reconnect uchun botni to‘xtatamiz
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+}
 
             if (!chest) {
                 console.log("Failed to open chest after multiple attempts.");
