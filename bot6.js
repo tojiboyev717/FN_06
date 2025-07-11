@@ -75,7 +75,7 @@ function init() {
         // Har 1 daqiqada bir honey olish
         setInterval(() => {
             withdrawHoney(bot, mcData);
-        }, 15 * 60 * 1000);
+        }, 5 * 60 * 1000);
         // Har 1 daqiqada /is warp sell yozish
         setInterval(() => {
             bot.chat('/is warp sell');
@@ -120,65 +120,57 @@ bot.on('windowOpen', async (window) => {
 	
     async function withdrawHoney(bot, mcData) {
         bot.chat('/is warp sell');
-        setTimeout(async () => {
-            var chestPosition = await bot.findBlock({
-                matching: mcData.blocksByName.chest.id,
-                maxDistance: 5,
-            });
-            if (!chestPosition) return;
 
-            // Implement retry logic
+        setTimeout(async () => {
+            const chestPosVec = new Vec3(5525, 90, -4377); // ✅ Siz ko‘rsatgan koordinata
+            const chestBlock = bot.blockAt(chestPosVec);
+
+            if (!chestBlock || chestBlock.name !== 'chest') {
+                console.log("❌ Koordinatadagi blok chest emas yoki topilmadi.");
+                return;
+            }
+
             let attempts = 0;
             let chest = null;
             const maxAttempts = 3;
 
             while (!chest && attempts < maxAttempts) {
-    try {
-        chest = await bot.openChest(chestPosition);
-    } catch (error) {
-        console.log(`Error opening chest: ${error}. Retrying...`);
-        attempts++;
+                try {
+                    chest = await bot.openChest(chestBlock);
+                } catch (error) {
+                    console.log(`⚠️ Error opening chest: ${error.message}. Retrying...`);
+                    attempts++;
 
-        // ✅ Xato bo'lgan qismni tuzatdik:
-        if (error.message && error.message.includes(`timeout of 20000ms`)) {
-            bot.quit('reconnect');
-            return; // Reconnect uchun botni to‘xtatamiz
-        }
+                    if (error.message.includes('timeout of 20000ms')) {
+                        console.log("❌ Window open timeout. Restarting bot...");
+                        bot.quit('reconnect');
+                        return;
+                    }
 
-        await new Promise(resolve => setTimeout(resolve, 5000));
-    }
-}
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+            }
 
             if (!chest) {
-                console.log("Failed to open chest after multiple attempts.");
+                console.log("❌ Chest ochilmadi, urinishlar tugadi.");
                 return;
             }
 
-            // Function to check if there are any free slots in the inventory
-            function hasFreeSlot() {
-                return bot.inventory.emptySlotCount() > 0;
-            }
-
-            // Function to check if there are any honey bottles left in the chest
-            function honeyLeftInChest(chest) {
-                return chest.slots.some(slot => slot?.type !== undefined && slot?.type !== null && slot?.name === 'honey_bottle' && slot?.count > 0);
-            }
-
-            // Iterate through the chest slots and withdraw honey bottles
             for (let slot of chest.slots) {
-                if (slot?.type !== undefined && slot?.type !== null && slot?.name === 'honey_bottle' && slot?.count > 0) {
-                    while (slot.count > 0 && hasFreeSlot()) {
-                        let countToWithdraw = Math.min(slot.count, bot.inventory.itemLimit - slot.count);
+                if (slot?.name === 'honey_bottle' && slot.count > 0) {
+                    while (slot.count > 0 && bot.inventory.emptySlotCount() > 0) {
+                        let withdrawCount = Math.min(slot.count, 64);
                         try {
-                            await chest.withdraw(slot.type, null, countToWithdraw);
-                            slot.count -= countToWithdraw;
-                        } catch (error) {
-                            // console.log(`Error withdrawing items: ${error}`);
+                            await chest.withdraw(slot.type, null, withdrawCount);
+                            slot.count -= withdrawCount;
+                        } catch (err) {
+                            console.log(`⚠️ Honey olishda xatolik: ${err.message}`);
                             break;
                         }
                     }
-                    if (!hasFreeSlot()) {
-                        // console.log("Inventory is full, stopping withdrawal.");
+
+                    if (bot.inventory.emptySlotCount() === 0) {
+                        console.log("✅ Inventory to‘ldi.");
                         break;
                     }
                 }
@@ -186,11 +178,10 @@ bot.on('windowOpen', async (window) => {
 
             await new Promise(resolve => setTimeout(resolve, 1000));
             await chest.close();
-            await new Promise(resolve => setTimeout(resolve, 1000));
             bot.chat('/is shop Food');
-        }, 500);
+        }, 1000);
     }
-	
+
     bot.on('end', () => {
         setTimeout(init, 5000);
     });
