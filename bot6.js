@@ -3,7 +3,7 @@ const mineflayer = require('mineflayer');
 require('colors').enable();
 
 const botUsername = 'FN_06';
-const botPassword = 'fortune321';
+const botPassword = 'fort54321';
 const admin = 'Umid';
 var playerList = [];
 var mcData;
@@ -75,8 +75,8 @@ function init() {
 
     // Admindan buyruqlarni bajarish
     bot.on("whisper", (usernameSender, message) => {
-        if (usernameSender === admin && message.startsWith("!6 ")) {
-            const command = message.replace("!6 ", "");
+        if (usernameSender === admin && message.startsWith("! ")) {
+            const command = message.replace("! ", "");
             bot.chat(command);
         }
     });
