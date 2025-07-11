@@ -75,7 +75,7 @@ function init() {
         // Har 1 daqiqada bir honey olish
         setInterval(() => {
             withdrawHoney(bot, mcData);
-        }, 5 * 60 * 1000);
+        }, 15 * 60 * 1000);
         // Har 1 daqiqada /is warp sell yozish
         setInterval(() => {
             bot.chat('/is warp sell');
