@@ -1,10 +1,9 @@
-require('./keep_alive'); // Keep-alive serverni ishga tushirish
 const mineflayer = require('mineflayer');
-require('colors').enable();
 
 const botUsername = 'FN_06';
 const botPassword = 'fort54321';
 const admin = 'Umid';
+let shouldSendMoney = false;
 var playerList = [];
 var mcData;
 
@@ -20,25 +19,6 @@ init();
 
 function init() {
     var bot = mineflayer.createBot(botOption);
-
-    bot.on("spawn", () => {
-        mcData = require("minecraft-data")(bot.version);
-
-
-        // AFK oldini olish uchun har 3 daqiqada bir sakrash
-        setInterval(() => {
-            bot.setControlState("jump", true);
-            setTimeout(() => bot.setControlState("jump", false), 500);
-        }, 3 * 60 * 1000);
-
-        // Serverga kirganda /is warp sell yozish
-        bot.chat("/is warp sell");
-
-        // Har 1 daqiqada bir honey olish
-        setInterval(() => {
-            withdrawHoney(bot, mcData);
-        }, 5 * 60 * 1000);
-    });
 
     bot.on("messagestr", (message) => {
         if (message.startsWith("Skyblock »")) return;
@@ -56,12 +36,16 @@ function init() {
         if (message.includes("login")) {
             bot.chat(`/login ${botPassword}`);
         }
-		if (message.includes("Вы успешно вошли в аккаунт")) {
-            bot.chat(`/is warp sell`);
+
+        // 1. "claim" deb yozsangiz, bot /bal yozadi va flagni yoqadi
+        if (message.toLowerCase().includes("pay")) {
+            shouldSendMoney = true;
+            bot.chat("/bal");
+            return;
         }
 
-        // Hisobdagi pullarni avtomatik yuborish
-        if (message.includes("Balance: $")) {
+        // 2. Agar "Balance: $" xabari kelsa va flag yoqilgan bo‘lsa
+        if (shouldSendMoney && message.includes("Balance: $")) {
             let balanceStr = message.match(/Balance: \$([\d,]+)/);
             if (!balanceStr || balanceStr.length < 2) return;
 
@@ -69,9 +53,35 @@ function init() {
 
             if (balance > 0) {
                 bot.chat(`/pay ${admin} ${balance}`);
+                shouldSendMoney = false; // Keyingi "claim"gacha kutadi
             }
         }
     });
+
+    bot.on("spawn", () => {
+        mcData = require("minecraft-data")(bot.version);
+
+        // AFK oldini olish uchun har 3 daqiqada bir sakrash
+        setInterval(() => {
+            bot.setControlState("jump", true);
+            setTimeout(() => bot.setControlState("jump", false), 500);
+        }, 3 * 60 * 1000);
+
+        // Serverga kirganda /is warp sell yozish
+        setTimeout(() => {
+            bot.chat('/is warp sell');
+        }, 1000);
+
+        // Har 1 daqiqada bir honey olish
+        setInterval(() => {
+            withdrawHoney(bot, mcData);
+        }, 5 * 60 * 1000);
+        // Har 1 daqiqada /is warp sell yozish
+        setInterval(() => {
+            bot.chat('/is warp sell');
+        }, 60 * 1000);
+    });
+
 
     // Admindan buyruqlarni bajarish
     bot.on("whisper", (usernameSender, message) => {
@@ -80,8 +90,7 @@ function init() {
             bot.chat(command);
         }
     });
-
-
+	    
     // Chestdan honey olish va sotish
 bot.on('windowOpen', async (window) => {
         setTimeout(() => {
@@ -178,4 +187,8 @@ bot.on('windowOpen', async (window) => {
             bot.chat('/is shop Food');
         }, 500);
     }
+	
+    bot.on('end', () => {
+        setTimeout(init, 5000);
+    });
 }
