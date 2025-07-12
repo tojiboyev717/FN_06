@@ -1,36 +1,34 @@
 const mineflayer = require('mineflayer');
 const Vec3 = require('vec3');
+require('./keep_alive');
 
 const botUsername = 'FN_06';
 const botPassword = 'fort54321';
 const admin = 'Umid';
-let shouldSendMoney = false;
-var playerList = [];
-var mcData;
-
 const botOption = {
     host: 'hypixel.uz',
     port: 25565,
     username: botUsername,
     password: botPassword,
-    version: '1.18.2',
+    version: '1.20.1',
 };
+
+let shouldSendMoney = false;
+let mcData;
 
 init();
 
 function init() {
-    var bot = mineflayer.createBot(botOption);
+    const bot = mineflayer.createBot(botOption);
 
-    bot.on("messagestr", (message) => {
+    bot.on('messagestr', (message) => {
         if (message.startsWith("Skyblock »")) return;
         console.log(message);
 
-        // Server restart bo'lsa chiqish
         if (message === "Server: Serverni kunlik restartiga 30 sekund qoldi") {
             bot.quit("20min");
         }
 
-        // Ro‘yxatdan o‘tish yoki login qilish
         if (message.includes("register")) {
             bot.chat(`/register ${botPassword} ${botPassword}`);
         }
@@ -38,23 +36,19 @@ function init() {
             bot.chat(`/login ${botPassword}`);
         }
 
-        // 1. "claim" deb yozsangiz, bot /bal yozadi va flagni yoqadi
+        // Pul jo‘natish logikasi
         if (message.toLowerCase().includes("pay")) {
             shouldSendMoney = true;
             bot.chat("/bal");
-            return;
         }
 
-        // 2. Agar "Balance: $" xabari kelsa va flag yoqilgan bo‘lsa
         if (shouldSendMoney && message.includes("Balance: $")) {
             let balanceStr = message.match(/Balance: \$([\d,]+)/);
             if (!balanceStr || balanceStr.length < 2) return;
-
             let balance = parseInt(balanceStr[1].replace(/,/g, ""));
-
             if (balance > 0) {
                 bot.chat(`/pay ${admin} ${balance}`);
-                shouldSendMoney = false; // Keyingi "claim"gacha kutadi
+                shouldSendMoney = false;
             }
         }
     });
@@ -62,38 +56,32 @@ function init() {
     bot.on("spawn", () => {
         mcData = require("minecraft-data")(bot.version);
 
-        // AFK oldini olish uchun har 3 daqiqada bir sakrash
+        // AFK harakat
         setInterval(() => {
             bot.setControlState("jump", true);
             setTimeout(() => bot.setControlState("jump", false), 500);
         }, 3 * 60 * 1000);
 
-        // Serverga kirganda /is warp sell yozish
+        // Kirganda /is warp sell
         setTimeout(() => {
             bot.chat('/is warp sell');
         }, 1000);
 
-        // Har 1 daqiqada bir honey olish
+        // Har 1 daqiqa honey olish
         setInterval(() => {
-            withdrawHoney(bot, mcData);
-        }, 60 * 1000);
-        // Har 1 daqiqada /is warp sell yozish
-        setInterval(() => {
-            bot.chat('/is warp sell');
+            withdrawHoney(bot);
         }, 60 * 1000);
     });
 
-
-    // Admindan buyruqlarni bajarish
+    // Admin komandasi
     bot.on("whisper", (usernameSender, message) => {
         if (usernameSender === admin && message.startsWith("! ")) {
             const command = message.replace("! ", "");
             bot.chat(command);
         }
     });
-	    
-    // Chestdan honey olish va sotish
-bot.on('windowOpen', async (window) => {
+
+    bot.on('windowOpen', async (window) => {
         setTimeout(() => {
             bot.closeWindow(window);
         }, 19000);
@@ -111,95 +99,84 @@ bot.on('windowOpen', async (window) => {
             }
             setTimeout(async () => {
                 await bot.closeWindow(window);
-                bot.chat('/is warp sell');
+                bot.chat('/is warp afk');
                 bot.chat('/is withdraw money 9999999999999999');
                 bot.chat('/bal');
             }, honeyCount * 20 + 100);
             return;
         }
     });
-	
+
     async function withdrawHoney(bot, mcData) {
-    // Warpdanga ishonch hosil qilish
     bot.chat('/is warp sell');
 
     setTimeout(async () => {
-        // 📍 1. Chest joylashuvi
-        const chestPosVec = new Vec3(5525, 90, -4377); // ➤ Siz bergan aniq koordinata
-        const chestBlock = bot.blockAt(chestPosVec);
+        const chestPosition = new Vec3(5525, 90, -4377); // Fikslangan joy
 
-        // ❌ Agar bu yerda chest bo‘lmasa, to‘xtaymiz
+        const chestBlock = bot.blockAt(chestPosition);
         if (!chestBlock || chestBlock.name !== 'chest') {
-            console.log("❌ Koordinatadagi blok chest emas yoki topilmadi.");
+            console.log("❌ Chest bloki topilmadi yoki noto‘g‘ri blok.");
             return;
         }
 
+        // Retry logika
         let attempts = 0;
         let chest = null;
         const maxAttempts = 3;
 
-        // 🔁 2. Chestni ochishga urinish
         while (!chest && attempts < maxAttempts) {
             try {
                 chest = await bot.openChest(chestBlock);
             } catch (error) {
-                console.log(`⚠️ Error opening chest: ${error.message}. Retrying...`);
+                console.log(`Error opening chest: ${error}. Retrying...`);
                 attempts++;
-
-                if (error.message.includes('timeout of 20000ms')) {
-                    console.log("❌ Chest window timeout. Reconnecting...");
-                    bot.quit('reconnect');
+                if (error.message.includes("timeout")) {
+                    await bot.quit('reconnect');
                     return;
                 }
-
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await bot.waitForTicks(20); // 1s kutish
             }
         }
 
-        if (!chest) {
-            console.log("❌ Chest ochilmadi, barcha urinishlar bekor bo‘ldi.");
-            return;
-        }
+            if (!chest) {
+                console.log("Failed to open chest after multiple attempts.");
+                return;
+            }
 
-        // 🧪 3. Honey_bottle item ID’sini aniqlash
-        const honeyItem = mcData.itemsByName['honey_bottle'];
-        if (!honeyItem) {
-            console.log("❌ honey_bottle item topilmadi mcData ichida.");
-            await chest.close();
-            return;
-        }
+            // Function to check if there are any free slots in the inventory
+            function hasFreeSlot() {
+                return bot.inventory.emptySlotCount() > 0;
+            }
 
-        const honeyId = honeyItem.id;
+            // Function to check if there are any honey bottles left in the chest
+            function honeyLeftInChest(chest) {
+                return chest.slots.some(slot => slot?.type !== undefined && slot?.type !== null && slot?.name === 'honey_bottle' && slot?.count > 0);
+            }
 
-        // 🍯 4. Honey bottle larni olish
-        for (let slot of chest.slots) {
-            if (slot?.name === 'honey_bottle' && slot.count > 0) {
-                while (slot.count > 0 && bot.inventory.emptySlotCount() > 0) {
-                    const countToWithdraw = Math.min(slot.count, 64);
-                    try {
-                        await chest.withdraw(honeyId, null, countToWithdraw); // ✅ To‘g‘ri ID bilan withdraw
-                        slot.count -= countToWithdraw;
-                        console.log(`✅ ${countToWithdraw} ta honey_bottle olindi.`);
-                    } catch (err) {
-                        console.log(`⚠️ Honey olishda xatolik: ${err.message}`);
+            // Iterate through the chest slots and withdraw honey bottles
+            for (let slot of chest.slots) {
+                if (slot?.type !== undefined && slot?.type !== null && slot?.name === 'honey_bottle' && slot?.count > 0) {
+                    while (slot.count > 0 && hasFreeSlot()) {
+                        let countToWithdraw = Math.min(slot.count, bot.inventory.itemLimit - slot.count);
+                        try {
+                            await chest.withdraw(slot.type, null, countToWithdraw);
+                            slot.count -= countToWithdraw;
+                        } catch (error) {
+                            // console.log(`Error withdrawing items: ${error}`);
+                            break;
+                        }
+                    }
+                    if (!hasFreeSlot()) {
+                        // console.log("Inventory is full, stopping withdrawal.");
                         break;
                     }
                 }
-
-                if (bot.inventory.emptySlotCount() === 0) {
-                    console.log("✅ Inventory to‘ldi. Yana olish imkonsiz.");
-                    break;
-                }
             }
-        }
 
-        // ✅ 5. Chestni yopish va do‘konga kirish
-        await chest.close();
-        bot.chat('/is shop Food');
-    }, 1000); // 1 soniya kutib ochamiz
-}
-
-    bot.on('end', () => {
-        setTimeout(init, 5000);
-    });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await chest.close();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            bot.chat('/is shop Food');
+        }, 500);
+    }
 }
