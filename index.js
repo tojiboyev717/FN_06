@@ -70,7 +70,7 @@ function init() {
         // Har 1 daqiqa honey olish
         setInterval(() => {
             withdrawHoney(bot);
-        }, 60 * 1000);
+        }, 10 * 60 * 1000);
     });
 
     // Admin komandasi
