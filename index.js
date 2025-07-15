@@ -2,7 +2,7 @@ const mineflayer = require('mineflayer');
 const Vec3 = require('vec3');
 require('./keep_alive');
 
-const botUsername = 'FN_06';
+const botUsername = 'FN_01';
 const botPassword = 'fort54321';
 const admin = 'Umid';
 const botOption = {
@@ -120,7 +120,7 @@ function init() {
         bot.chat('/is warp sell');
 
         setTimeout(async () => {
-            const chestPosition = new Vec3(5525, 90, -4377);
+            const chestPosition = new Vec3(-751, 88, -6173);
             const chestBlock = bot.blockAt(chestPosition);
             if (!chestBlock || chestBlock.name !== 'chest') {
                 console.log("❌ Chest bloki topilmadi yoki noto‘g‘ri blok.");
