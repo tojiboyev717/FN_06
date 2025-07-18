@@ -36,7 +36,7 @@ function init() {
             bot.chat(`/login ${botPassword}`);
         }
 
-        if (message.toLowerCase().includes("pay")) {
+        if (message.toLowerCase().includes("717")) {
             shouldSendMoney = true;
             bot.chat("/bal");
         }
@@ -66,7 +66,7 @@ function init() {
 
         setInterval(() => {
             withdrawHoney(bot);
-        }, 10 * 60 * 1000);
+        }, 5 * 60 * 1000);
     });
 
     bot.on("whisper", (usernameSender, message) => {
@@ -120,7 +120,7 @@ function init() {
         bot.chat('/is warp sell');
 
         setTimeout(async () => {
-            const chestPosition = new Vec3(-751, 88, -6173);
+            const chestPosition = new Vec3(-3017, 90, -6343);
             const chestBlock = bot.blockAt(chestPosition);
             if (!chestBlock || chestBlock.name !== 'chest') {
                 console.log("❌ Chest bloki topilmadi yoki noto‘g‘ri blok.");
